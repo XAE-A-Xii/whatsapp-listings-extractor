@@ -25,7 +25,7 @@ object InventoryCsvWriter {
     fun subExcelFileName(projectName: String, months: Long): String {
         val sanitized = projectName.trim().replace(Regex("[^A-Za-z0-9_]+"), "_").trim('_')
         val name = if (sanitized.isEmpty()) "Project" else sanitized
-        return "Inventory_${name}_${months}m.csv"
+        return "Inventory_${name}_${InventoryWindow.suffix(months)}.csv"
     }
 
     fun singleLineCsvText(value: String?): String {

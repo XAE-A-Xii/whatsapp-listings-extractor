@@ -9,6 +9,7 @@ import com.privacy.whatsappdecryptor.core.export.JsonChatExporter
 import com.privacy.whatsappdecryptor.core.export.TxtChatExporter
 import android.content.Context
 import com.privacy.whatsappdecryptor.core.inventory.InventoryCsvWriter
+import com.privacy.whatsappdecryptor.core.inventory.InventoryWindow
 import com.privacy.whatsappdecryptor.core.inventory.AndroidInventorySql
 import com.privacy.whatsappdecryptor.core.inventory.StreamingInventoryStore
 import kotlinx.coroutines.CancellationException
@@ -156,7 +157,7 @@ class ChatViewModel : ViewModel() {
     private fun loadCachedProjectSummaries(databaseFile: File) {
         viewModelScope.launch(Dispatchers.IO) {
             CustomProjectRepository.loadAndSync(databaseFile.parentFile)
-            val listingsDb = File(databaseFile.parentFile, "active_inventory/listings_${_projectMonths.value}m.db")
+            val listingsDb = activeListingsDb(databaseFile.parentFile, _projectMonths.value)
             val cacheDb = File(databaseFile.parentFile, "inventory_cache/parsed-text.db")
             if (listingsDb.exists() && cacheDb.exists()) {
                 runCatching {
@@ -191,7 +192,7 @@ class ChatViewModel : ViewModel() {
         _projectMonths.value = months
         context?.let { ctx ->
             val databaseFile = (_dbState.value as? DatabaseState.Ready)?.file
-            val listingsDb = databaseFile?.let { File(it.parentFile, "active_inventory/listings_${months}m.db") }
+            val listingsDb = databaseFile?.let { activeListingsDb(it.parentFile, months) }
             if (listingsDb?.exists() == true) {
                 // If this timeframe was already scanned and cached, load it immediately into UI
                 viewModelScope.launch(Dispatchers.IO) {
@@ -241,7 +242,7 @@ class ChatViewModel : ViewModel() {
     fun loadInListings(context: Context, months: Long = _projectMonths.value) {
         val appContext = context.applicationContext
         val databaseFile = (_dbState.value as? DatabaseState.Ready)?.file
-        val listingsDb = databaseFile?.let { File(it.parentFile, "active_inventory/listings_${months}m.db") }
+        val listingsDb = databaseFile?.let { activeListingsDb(it.parentFile, months) }
         if (listingsDb == null || !listingsDb.exists()) {
             if (databaseFile != null && databaseFile.exists() && inventoryJob?.isActive != true) {
                 scanProjectInventory(appContext, months, forceRefresh = false)
@@ -279,7 +280,7 @@ class ChatViewModel : ViewModel() {
     fun loadOutListings(context: Context, months: Long = _projectMonths.value) {
         val appContext = context.applicationContext
         val databaseFile = (_dbState.value as? DatabaseState.Ready)?.file
-        val listingsDb = databaseFile?.let { File(it.parentFile, "active_inventory/listings_${months}m.db") }
+        val listingsDb = databaseFile?.let { activeListingsDb(it.parentFile, months) }
         if (listingsDb == null || !listingsDb.exists()) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -309,7 +310,7 @@ class ChatViewModel : ViewModel() {
             CustomProjectRepository.addCustomProject(appContext, clean)
             val months = _projectMonths.value
             val databaseFile = (_dbState.value as? DatabaseState.Ready)?.file
-            val listingsDb = databaseFile?.let { File(it.parentFile, "active_inventory/listings_${months}m.db") }
+            val listingsDb = databaseFile?.let { activeListingsDb(it.parentFile, months) }
             val cacheDb = databaseFile?.let { File(it.parentFile, "inventory_cache/parsed-text.db") }
             var count = 0
             if (listingsDb?.exists() == true && cacheDb?.exists() == true) {
@@ -347,7 +348,7 @@ class ChatViewModel : ViewModel() {
             CustomProjectRepository.addCustomProject(appContext, clean, aliases)
             val months = _projectMonths.value
             val databaseFile = (_dbState.value as? DatabaseState.Ready)?.file
-            val listingsDb = databaseFile?.let { File(it.parentFile, "active_inventory/listings_${months}m.db") }
+            val listingsDb = databaseFile?.let { activeListingsDb(it.parentFile, months) }
             val cacheDb = databaseFile?.let { File(it.parentFile, "inventory_cache/parsed-text.db") }
             if (listingsDb?.exists() == true && cacheDb?.exists() == true) {
                 runCatching {
@@ -384,7 +385,7 @@ class ChatViewModel : ViewModel() {
             CustomProjectRepository.removeCustomProject(appContext, clean)
             val months = _projectMonths.value
             val databaseFile = (_dbState.value as? DatabaseState.Ready)?.file
-            val listingsDb = databaseFile?.let { File(it.parentFile, "active_inventory/listings_${months}m.db") }
+            val listingsDb = databaseFile?.let { activeListingsDb(it.parentFile, months) }
             val cacheDb = databaseFile?.let { File(it.parentFile, "inventory_cache/parsed-text.db") }
             if (listingsDb?.exists() == true && cacheDb?.exists() == true) {
                 runCatching {
@@ -564,6 +565,10 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    private fun activeListingsDb(parent: File, window: Long): File {
+        return File(parent, "active_inventory/${InventoryWindow.databaseName(window)}")
+    }
+
     private suspend fun getOrCreateActiveStore(
         appContext: Context,
         months: Long,
@@ -572,7 +577,7 @@ class ChatViewModel : ViewModel() {
     ): Pair<File, File> = withContext(Dispatchers.IO) {
         val sourceFile = (_dbState.value as? DatabaseState.Ready)?.file ?: error("Database not loaded")
         val activeDir = File(appContext.noBackupFilesDir, "active_inventory").apply { mkdirs() }
-        val listingsDb = File(activeDir, "listings_${months}m.db")
+        val listingsDb = File(activeDir, InventoryWindow.databaseName(months))
         val cacheDir = File(appContext.noBackupFilesDir, "inventory_cache").apply { mkdirs() }
         val parsedCacheDb = File(cacheDir, "parsed-text.db")
 
@@ -586,8 +591,8 @@ class ChatViewModel : ViewModel() {
         File(listingsDb.parentFile, "${listingsDb.name}-journal").delete()
         AndroidWhatsAppDatabaseReader.open(sourceFile).use { reader ->
             val latest = reader.latestBackupTimestamp() ?: error("No messages found in this backup")
-            val cutoff = Instant.ofEpochMilli(latest).atZone(ZoneId.systemDefault())
-                .toLocalDate().minusMonths(months).withDayOfMonth(1)
+            val latestDate = Instant.ofEpochMilli(latest).atZone(ZoneId.systemDefault()).toLocalDate()
+            val cutoff = InventoryWindow.cutoff(latestDate, months)
             val cutoffMs = cutoff.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
             AndroidInventorySql(listingsDb).use { work ->
@@ -717,7 +722,7 @@ class ChatViewModel : ViewModel() {
             try {
                 val (listingsDb, parsedCacheDb) = getOrCreateActiveStore(appContext, months, false)
                 val exportDir = File(appContext.cacheDir, "shared_exports").apply { mkdirs() }
-                val zipFile = File(exportDir, "All_Projects_SubExcels_${LocalDate.now()}_${months}m.zip")
+                val zipFile = File(exportDir, "All_Projects_SubExcels_${LocalDate.now()}_${InventoryWindow.suffix(months)}.zip")
 
                 AndroidInventorySql(listingsDb).use { work ->
                     AndroidInventorySql(parsedCacheDb).use { cache ->
@@ -768,7 +773,7 @@ class ChatViewModel : ViewModel() {
                     _inventoryExportState.value = InventoryExportState.Processing(processed, detail)
                 }
                 val exportDir = File(appContext.cacheDir, "shared_exports").apply { mkdirs() }
-                val exportFile = File(exportDir, "Master Important Dealer Inventory ${LocalDate.now()} ${months}m.csv")
+                val exportFile = File(exportDir, "Master Important Dealer Inventory ${LocalDate.now()} ${InventoryWindow.suffix(months)}.csv")
                 val staged = File(appContext.cacheDir, "master_inventory_staged.csv")
 
                 AndroidInventorySql(listingsDb).use { work ->

@@ -1,6 +1,8 @@
 package com.privacy.whatsappdecryptor.ui.screens
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +19,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.privacy.whatsappdecryptor.core.inventory.ProjectInventorySummary
 import com.privacy.whatsappdecryptor.core.inventory.ProjectRegistry
+import com.privacy.whatsappdecryptor.ui.fold.FoldPosture
+import com.privacy.whatsappdecryptor.ui.fold.foldPosture
 import com.privacy.whatsappdecryptor.ui.theme.Spacing
 import java.time.Instant
 import java.time.ZoneId
@@ -68,6 +72,7 @@ fun InListingsScreen(
     val projectsWithInventory = remember(inProjects) {
         inProjects.count { it.totalListings > 0 }
     }
+    val cover = foldPosture() == FoldPosture.Cover
 
     if (showAddDialog) {
         AlertDialog(
@@ -161,15 +166,21 @@ fun InListingsScreen(
                     }
                 },
                 actions = {
-                    FilledTonalButton(
-                        onClick = { showAddDialog = true },
-                        shape = RoundedCornerShape(Spacing.sm),
-                        contentPadding = PaddingValues(horizontal = Spacing.sm),
-                        modifier = Modifier.height(36.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    if (cover) {
+                        IconButton(onClick = { showAddDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add society")
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = { showAddDialog = true },
+                            shape = RoundedCornerShape(Spacing.sm),
+                            contentPadding = PaddingValues(horizontal = Spacing.sm),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
                     }
                     IconButton(onClick = onRefresh) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh IN List")
@@ -340,52 +351,21 @@ fun InListingsScreen(
                         }
                     }
 
-                    // Action Buttons Row: Generate Master Excel & Export All ZIP with 48dp touch targets
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        Button(
-                            onClick = onExportMasterCsv,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            shape = RoundedCornerShape(Spacing.sm),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
+                    if (cover) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
-                            Icon(
-                                Icons.Default.Description,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(Spacing.xs))
-                            Text(
-                                "Master Excel",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
+                            MasterExcelButton(onExportMasterCsv, Modifier.fillMaxWidth())
+                            AllSubExcelsButton(onExportAllZip, Modifier.fillMaxWidth())
                         }
-
-                        OutlinedButton(
-                            onClick = onExportAllZip,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            shape = RoundedCornerShape(Spacing.sm)
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
-                            Icon(
-                                Icons.Default.FolderZip,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(Spacing.xs))
-                            Text(
-                                "All Sub-Excels",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            MasterExcelButton(onExportMasterCsv, Modifier.weight(1f))
+                            AllSubExcelsButton(onExportAllZip, Modifier.weight(1f))
                         }
                     }
                 }
@@ -415,6 +395,7 @@ fun InListingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = Spacing.md, vertical = Spacing.xs),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
@@ -523,6 +504,33 @@ fun InListingsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MasterExcelButton(onClick: () -> Unit, modifier: Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(Spacing.sm),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+    ) {
+        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(Spacing.xs))
+        Text("Master Excel", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AllSubExcelsButton(onClick: () -> Unit, modifier: Modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(Spacing.sm)
+    ) {
+        Icon(Icons.Default.FolderZip, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(Spacing.xs))
+        Text("All Sub-Excels", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 

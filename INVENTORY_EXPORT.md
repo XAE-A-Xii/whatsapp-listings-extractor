@@ -1,9 +1,7 @@
 # Inventory export
 
 The Android **Master Property Inventory** action uses a disk-backed export pipeline.
-Choose **1 month** or **3 months** before exporting (1 month is the default).
-The cutoff is the first day N months before the latest message in the backup;
-for a September 16 backup, 1 month starts August 1.
+The app scans the last 7 days. That window starts at 00:00 seven days before the latest message's date.
 
 The app reads text-only messages from active group chats through scoped SQLite
 cursors. It caches parsed text in `noBackupFilesDir/inventory_cache/parsed-text.db`,

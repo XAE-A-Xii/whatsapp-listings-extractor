@@ -15,8 +15,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.privacy.whatsappdecryptor.core.inventory.ProjectInventorySummary
+import com.privacy.whatsappdecryptor.ui.fold.FoldPosture
+import com.privacy.whatsappdecryptor.ui.fold.foldPosture
 import com.privacy.whatsappdecryptor.ui.theme.Spacing
 import java.time.Instant
 import java.time.ZoneId
@@ -70,12 +71,16 @@ fun OutListingsScreen(
                         Text(
                             text = "Other Societies (OUT)",
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${outProjects.size} Discovered • $totalOutListings Listings",
+                            text = "${outProjects.size} discovered • $totalOutListings listings",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -271,6 +276,7 @@ private fun OutSocietyCard(
     project: ProjectInventorySummary,
     onPromote: () -> Unit
 ) {
+    val cover = foldPosture() == FoldPosture.Cover
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -279,72 +285,81 @@ private fun OutSocietyCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = project.society,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(Spacing.xxs))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(Spacing.xs)
-                    ) {
-                        Text(
-                            text = "${project.totalListings} listings",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 2.dp),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    if (project.uniqueDealers > 0) {
-                        Text(
-                            text = "• ${project.uniqueDealers} dealers",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.width(Spacing.sm))
-
-            // 48dp Thumb-zone "+ Add to IN" Button
-            Button(
-                onClick = onPromote,
-                shape = RoundedCornerShape(Spacing.sm),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
-                modifier = Modifier.height(48.dp)
+        if (cover) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(Spacing.xxs))
+                OutSocietyDetails(project)
+                AddToInButton(onPromote, Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OutSocietyDetails(project, Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                AddToInButton(onPromote, Modifier)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OutSocietyDetails(project: ProjectInventorySummary, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = project.society,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(Spacing.xxs))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(Spacing.xs)
+            ) {
                 Text(
-                    text = "Add to IN",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelLarge
+                    text = "${project.totalListings} listings",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 2.dp),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            if (project.uniqueDealers > 0) {
+                Text(
+                    text = "• ${project.uniqueDealers} dealers",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AddToInButton(onClick: () -> Unit, modifier: Modifier) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(Spacing.sm),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
+        modifier = modifier.height(48.dp)
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(Spacing.xxs))
+        Text("Add to IN", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
     }
 }

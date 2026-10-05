@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.privacy.whatsappdecryptor.core.inventory.InventoryWindow
 import com.privacy.whatsappdecryptor.core.service.DecryptionForegroundService
+import com.privacy.whatsappdecryptor.ui.fold.FoldPosture
+import com.privacy.whatsappdecryptor.ui.fold.foldPosture
 import com.privacy.whatsappdecryptor.ui.screens.*
 import com.privacy.whatsappdecryptor.ui.theme.WhatsAppDecryptorTheme
 import com.privacy.whatsappdecryptor.ui.viewmodel.ChatViewModel
@@ -71,7 +74,6 @@ class MainActivity : ComponentActivity() {
                     val projectScanProgress by viewModel.projectScanProgress.collectAsStateWithLifecycle()
                     val projectSearchQuery by viewModel.projectSearchQuery.collectAsStateWithLifecycle()
                     val projectStatusFilter by viewModel.projectStatusFilter.collectAsStateWithLifecycle()
-                    val projectMonths by viewModel.projectMonths.collectAsStateWithLifecycle()
 
                     // IN Listings States
                     val inProjectSummaries by viewModel.inProjectSummaries.collectAsStateWithLifecycle()
@@ -170,6 +172,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val isDashboard = currentScreen == Screen.PROJECTS || currentScreen == Screen.IN_LISTINGS || currentScreen == Screen.OUT_LISTINGS
+                    val cover = foldPosture() == FoldPosture.Cover
 
                     Scaffold(
                         bottomBar = {
@@ -217,7 +220,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         label = {
                                              Text(
-                                                 "IN Listings",
+                                                 if (cover) "IN" else "IN Listings",
                                                  fontWeight = if (currentScreen == Screen.IN_LISTINGS) FontWeight.Bold else FontWeight.Normal
                                              )
                                         },
@@ -237,7 +240,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         label = {
                                              Text(
-                                                 "OUT Listings",
+                                                 if (cover) "OUT" else "OUT Listings",
                                                  fontWeight = if (currentScreen == Screen.OUT_LISTINGS) FontWeight.Bold else FontWeight.Normal
                                              )
                                         },
@@ -251,6 +254,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(innerPadding)
+                                .consumeWindowInsets(innerPadding)
                         ) {
                             when (currentScreen) {
                                 Screen.SETUP -> {
@@ -285,23 +289,25 @@ class MainActivity : ComponentActivity() {
                                         onSearchQueryChanged = viewModel::onProjectSearchQueryChanged,
                                         statusFilter = projectStatusFilter,
                                         onStatusFilterChanged = viewModel::onProjectStatusFilterChanged,
-                                        selectedMonths = projectMonths,
-                                        onMonthsChanged = { viewModel.onProjectMonthsChanged(it, this@MainActivity) },
-                                        onScanProjects = { months ->
-                                            viewModel.scanProjectInventory(this@MainActivity, months, forceRefresh = true)
+                                        onScanProjects = {
+                                            viewModel.scanProjectInventory(
+                                                this@MainActivity,
+                                                InventoryWindow.LAST_WEEK,
+                                                forceRefresh = true
+                                            )
                                         },
                                         onExportSingleProject = { proj ->
-                                            viewModel.exportSingleProjectSubExcel(this@MainActivity, proj, projectMonths) { shareFile ->
+                                            viewModel.exportSingleProjectSubExcel(this@MainActivity, proj, InventoryWindow.LAST_WEEK) { shareFile ->
                                                 shareFile(shareFile, "text/csv", "Sub-Excel: ${proj.society}", "Share ${proj.society} Sub-Excel")
                                             }
                                         },
                                         onExportAllZip = {
-                                            viewModel.exportAllProjectsZip(this@MainActivity, projectMonths) { zipFile ->
+                                            viewModel.exportAllProjectsZip(this@MainActivity, InventoryWindow.LAST_WEEK) { zipFile ->
                                                 shareFile(zipFile, "application/zip", "All Project Sub-Excels", "Share All Project Sub-Excels (ZIP)")
                                             }
                                         },
                                         onExportMasterCsv = {
-                                            viewModel.exportMasterPropertyInventory(this@MainActivity, projectMonths) { csvFile ->
+                                            viewModel.exportMasterPropertyInventory(this@MainActivity, InventoryWindow.LAST_WEEK) { csvFile ->
                                                 shareFile(csvFile, "text/csv", "Master Property Inventory", "Share Master Inventory CSV")
                                             }
                                         },
@@ -320,7 +326,11 @@ class MainActivity : ComponentActivity() {
                                         searchQuery = inListingsSearchQuery,
                                         onSearchQueryChanged = { viewModel.onInListingsSearchQueryChanged(it, this@MainActivity) },
                                         onScanProjects = {
-                                            viewModel.scanProjectInventory(this@MainActivity, projectMonths, forceRefresh = true)
+                                            viewModel.scanProjectInventory(
+                                                this@MainActivity,
+                                                InventoryWindow.LAST_WEEK,
+                                                forceRefresh = true
+                                            )
                                         },
                                         onAddSociety = { name, aliases ->
                                             viewModel.addManualInSociety(name, aliases, this@MainActivity)
@@ -329,17 +339,17 @@ class MainActivity : ComponentActivity() {
                                             viewModel.removeCustomInSociety(name, this@MainActivity)
                                         },
                                         onExportSingleProject = { proj ->
-                                            viewModel.exportSingleProjectSubExcel(this@MainActivity, proj, projectMonths) { shareFile ->
+                                            viewModel.exportSingleProjectSubExcel(this@MainActivity, proj, InventoryWindow.LAST_WEEK) { shareFile ->
                                                 shareFile(shareFile, "text/csv", "Sub-Excel: ${proj.society}", "Share ${proj.society} Sub-Excel")
                                             }
                                         },
                                         onExportMasterCsv = {
-                                            viewModel.exportMasterPropertyInventory(this@MainActivity, projectMonths) { csvFile ->
+                                            viewModel.exportMasterPropertyInventory(this@MainActivity, InventoryWindow.LAST_WEEK) { csvFile ->
                                                 shareFile(csvFile, "text/csv", "Master Property Inventory", "Share Master Inventory CSV")
                                             }
                                         },
                                         onExportAllZip = {
-                                            viewModel.exportAllProjectsZip(this@MainActivity, projectMonths) { zipFile ->
+                                            viewModel.exportAllProjectsZip(this@MainActivity, InventoryWindow.LAST_WEEK) { zipFile ->
                                                 shareFile(zipFile, "application/zip", "All Project Sub-Excels", "Share All Project Sub-Excels (ZIP)")
                                             }
                                         },

@@ -4,6 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.privacy.whatsappdecryptor.core.inventory.ProjectInventorySummary
+import com.privacy.whatsappdecryptor.ui.fold.FoldPosture
+import com.privacy.whatsappdecryptor.ui.fold.foldPosture
 import com.privacy.whatsappdecryptor.ui.theme.Spacing
 import java.time.Instant
 import java.time.ZoneId
@@ -38,9 +43,7 @@ fun ProjectInventoryScreen(
     onSearchQueryChanged: (String) -> Unit,
     statusFilter: String,
     onStatusFilterChanged: (String) -> Unit,
-    selectedMonths: Long,
-    onMonthsChanged: (Long) -> Unit,
-    onScanProjects: (Long) -> Unit,
+    onScanProjects: () -> Unit,
     onExportSingleProject: (ProjectInventorySummary) -> Unit,
     onExportAllZip: () -> Unit,
     onExportMasterCsv: () -> Unit,
@@ -68,6 +71,7 @@ fun ProjectInventoryScreen(
     val totalListingsCount = remember(projectSummaries) {
         projectSummaries.sumOf { it.totalListings }
     }
+    val cover = foldPosture() == FoldPosture.Cover
 
     Scaffold(
         topBar = {
@@ -100,7 +104,7 @@ fun ProjectInventoryScreen(
                                 text = if (projectSummaries.isNotEmpty()) {
                                     "${projectSummaries.size} projects • $totalListingsCount listings"
                                 } else {
-                                    "Individual property spreadsheets"
+                                    "Last 7 days"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -138,7 +142,7 @@ fun ProjectInventoryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Control Header: Month selector & Global export actions
+            // Control Header: timeframe selector and global export actions
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -152,101 +156,83 @@ fun ProjectInventoryScreen(
                     modifier = Modifier.padding(Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    // Timeframe Window Segmented Pill Control
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
-                    ) {
-                        Text(
-                            text = "Timeframe Window",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Text(
+                        text = "Last 7 days",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-                        Surface(
-                            shape = RoundedCornerShape(Spacing.sm),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.fillMaxWidth()
+                    if (cover) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(Spacing.xxs),
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.xxs)
-                            ) {
-                                listOf(1L to "Past 1 Month", 3L to "Past 3 Months").forEach { (months, label) ->
-                                    val isSelected = selectedMonths == months
-                                    Surface(
-                                        onClick = { onMonthsChanged(months) },
-                                        shape = RoundedCornerShape(Spacing.xs),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.padding(vertical = Spacing.xs),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                            )
-                                        }
-                                    }
+                            ProjectScanButton(
+                                empty = projectSummaries.isEmpty(),
+                                enabled = !isScanning,
+                                onClick = onScanProjects,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (projectSummaries.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = onExportAllZip,
+                                    enabled = !isScanning,
+                                    shape = RoundedCornerShape(Spacing.sm),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Archive, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(Spacing.xs))
+                                    Text("ZIP All", fontWeight = FontWeight.SemiBold)
+                                }
+                                OutlinedButton(
+                                    onClick = onExportMasterCsv,
+                                    enabled = !isScanning,
+                                    shape = RoundedCornerShape(Spacing.sm),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(Spacing.xs))
+                                    Text("Master CSV", fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
-                    }
-
-                    // Action Buttons: Scan / Zip / Master with 48dp touch targets
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        Button(
-                            onClick = { onScanProjects(selectedMonths) },
-                            enabled = !isScanning,
-                            shape = RoundedCornerShape(Spacing.sm),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
-                            Icon(
-                                imageVector = if (projectSummaries.isEmpty()) Icons.Default.PlayArrow else Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(Spacing.xs))
-                            Text(
-                                if (projectSummaries.isEmpty()) "Scan Projects" else "Rescan",
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        if (projectSummaries.isNotEmpty()) {
-                            OutlinedButton(
-                                onClick = onExportAllZip,
+                            ProjectScanButton(
+                                empty = projectSummaries.isEmpty(),
                                 enabled = !isScanning,
-                                shape = RoundedCornerShape(Spacing.sm),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                            ) {
-                                Icon(Icons.Default.Archive, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(Spacing.xs))
-                                Text("ZIP All", fontWeight = FontWeight.SemiBold)
-                            }
-
-                            FilledTonalIconButton(
-                                onClick = onExportMasterCsv,
-                                enabled = !isScanning,
-                                shape = RoundedCornerShape(Spacing.sm),
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(Icons.Default.Share, contentDescription = "Export Master CSV")
+                                onClick = onScanProjects,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (projectSummaries.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = onExportAllZip,
+                                    enabled = !isScanning,
+                                    shape = RoundedCornerShape(Spacing.sm),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Archive, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(Spacing.xs))
+                                    Text("ZIP All", fontWeight = FontWeight.SemiBold)
+                                }
+                                FilledTonalIconButton(
+                                    onClick = onExportMasterCsv,
+                                    enabled = !isScanning,
+                                    shape = RoundedCornerShape(Spacing.sm),
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = "Export Master CSV")
+                                }
                             }
                         }
                     }
@@ -376,7 +362,7 @@ fun ProjectInventoryScreen(
                         )
                         Spacer(modifier = Modifier.height(Spacing.xs))
                         Button(
-                            onClick = { onScanProjects(selectedMonths) },
+                            onClick = onScanProjects,
                             shape = RoundedCornerShape(Spacing.sm),
                             modifier = Modifier.height(48.dp)
                         ) {
@@ -400,20 +386,64 @@ fun ProjectInventoryScreen(
                     )
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-                ) {
-                    items(filteredProjects, key = { it.society }) { project ->
-                        ProjectCard(
-                            project = project,
-                            onExportSubExcel = { onExportSingleProject(project) }
-                        )
+                if (cover) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        items(filteredProjects, key = { it.society }) { project ->
+                            ProjectCard(
+                                project = project,
+                                onExportSubExcel = { onExportSingleProject(project) }
+                            )
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
+                        items(filteredProjects, key = { it.society }) { project ->
+                            ProjectCard(
+                                project = project,
+                                onExportSubExcel = { onExportSingleProject(project) }
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProjectScanButton(
+    empty: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(Spacing.sm),
+        modifier = modifier.height(48.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+    ) {
+        Icon(
+            imageVector = if (empty) Icons.Default.PlayArrow else Icons.Default.Refresh,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(Spacing.xs))
+        Text(
+            if (empty) "Scan Projects" else "Rescan",
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -557,7 +587,7 @@ private fun ProjectCard(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(Spacing.xs))
-                Text("Export Sub-Excel (.csv)", fontWeight = FontWeight.SemiBold)
+                Text("Export CSV", fontWeight = FontWeight.SemiBold)
             }
         }
     }
